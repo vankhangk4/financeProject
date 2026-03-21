@@ -30,7 +30,7 @@ def get_monthly_report(
             db.query(func.coalesce(func.sum(Transaction.amount), 0))
             .filter(
                 Transaction.user_id == current_user.id,
-                Transaction.transaction_type == TransactionType.INCOME,
+                Transaction.transaction_type == TransactionType.INCOME.value,
                 Transaction.date >= start,
                 Transaction.date <= end,
             )
@@ -41,7 +41,7 @@ def get_monthly_report(
             db.query(func.coalesce(func.sum(Transaction.amount), 0))
             .filter(
                 Transaction.user_id == current_user.id,
-                Transaction.transaction_type == TransactionType.EXPENSE,
+                Transaction.transaction_type == TransactionType.EXPENSE.value,
                 Transaction.date >= start,
                 Transaction.date <= end,
             )
@@ -60,7 +60,7 @@ def get_monthly_report(
             .join(Transaction, Transaction.category_id == Category.id)
             .filter(
                 Transaction.user_id == current_user.id,
-                Transaction.transaction_type == TransactionType.EXPENSE,
+                Transaction.transaction_type == TransactionType.EXPENSE.value,
                 Transaction.date >= start,
                 Transaction.date <= end,
             )

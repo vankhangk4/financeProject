@@ -31,7 +31,7 @@ def get_dashboard_stats(
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
             Transaction.user_id == current_user.id,
-            Transaction.transaction_type == TransactionType.INCOME,
+            Transaction.transaction_type == TransactionType.INCOME.value,
             Transaction.date >= month_start,
             Transaction.date <= month_end,
         )
@@ -95,7 +95,7 @@ def get_dashboard_stats(
             .filter(
                 Transaction.user_id == current_user.id,
                 Transaction.category_id == budget.category_id,
-                Transaction.transaction_type == TransactionType.EXPENSE,
+                Transaction.transaction_type == TransactionType.EXPENSE.value,
                 Transaction.date >= start,
                 Transaction.date <= end,
             )

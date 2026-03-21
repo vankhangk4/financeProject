@@ -12,6 +12,8 @@ from app.api import (
     reports_router,
     ai_router,
     chatbot_router,
+    alerts_router,
+    chat_sessions_router,
 )
 
 # Create tables
@@ -42,6 +44,8 @@ app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
 app.include_router(ai_router, prefix=settings.API_V1_STR)
 app.include_router(chatbot_router, prefix=settings.API_V1_STR)
+app.include_router(chat_sessions_router, prefix=settings.API_V1_STR)
+app.include_router(alerts_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

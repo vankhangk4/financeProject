@@ -24,10 +24,23 @@ class Settings(BaseSettings):
     # Chatbot
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OPENAI_API_KEY: Optional[str] = None
+    GROQ_API_KEY: Optional[str] = None
+    LLM_PROVIDER: str = "groq"  # "groq" or "ollama"
+
+    # Debug
+    DEBUG: bool = False
+
+    # Email
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAILS_FROM: str = "noreply@financemanager.com"
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

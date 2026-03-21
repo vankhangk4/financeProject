@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.models.models import User, Transaction, Category
-from app.schemas.schemas import AICategorizationResponse, CashFlowPrediction, AnomalyAlert
+from app.models.models import User, Transaction, Category, TransactionType
+from app.schemas.schemas import AICategorizationRequest, AICategorizationResponse, CashFlowPrediction, AnomalyAlert
 from app.ai.transaction_classifier import TransactionClassifier
 from app.ai.cash_flow_predictor import CashFlowPredictor
 from app.ai.anomaly_detector import AnomalyDetector
@@ -14,8 +14,7 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 
 @router.post("/categorize", response_model=AICategorizationResponse)
 def categorize_transaction(
-    description: str,
-    amount: float = None,
+    request: AICategorizationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -38,7 +37,7 @@ def categorize_transaction(
         labels = [t.category_id for t in labeled]
         classifier.train(texts, labels)
 
-    category_id, confidence = classifier.predict(description)
+    category_id, confidence = classifier.predict(request.description)
 
     if category_id == 0:
         # Return most common category as fallback
@@ -92,7 +91,10 @@ def predict_cashflow(
     """Predict future cash flow."""
     transactions = (
         db.query(Transaction)
-        .filter(Transaction.user_id == current_user.id)
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.transaction_type != TransactionType.TRANSFER.value,
+        )
         .all()
     )
 
@@ -100,7 +102,7 @@ def predict_cashflow(
         {
             "date": t.date,
             "amount": t.amount,
-            "type": t.transaction_type.value,
+            "type": t.transaction_type,
         }
         for t in transactions
     ]
@@ -121,7 +123,10 @@ def get_anomaly_alerts(
     """Get spending anomaly alerts."""
     transactions = (
         db.query(Transaction)
-        .filter(Transaction.user_id == current_user.id)
+        .filter(
+            Transaction.user_id == current_user.id,
+            Transaction.transaction_type != TransactionType.TRANSFER.value,
+        )
         .all()
     )
 
@@ -131,7 +136,7 @@ def get_anomaly_alerts(
         {
             "date": t.date,
             "amount": t.amount,
-            "type": t.transaction_type.value,
+            "type": t.transaction_type,
             "category_id": t.category_id,
         }
         for t in transactions

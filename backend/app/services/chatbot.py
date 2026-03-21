@@ -2,16 +2,23 @@ import os
 from typing import List, Optional
 from app.core.config import settings
 
+LANGCHAIN_GROQ_AVAILABLE = False
+LANGCHAIN_OLLAMA_AVAILABLE = False
+
+try:
+    from langchain_groq import ChatGroq
+    LANGCHAIN_GROQ_AVAILABLE = True
+except ImportError:
+    pass
+
 try:
     from langchain_community.llms import Ollama
-    from langchain.chains import RetrievalQA
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import Chroma
     from langchain_community.embeddings import OllamaEmbeddings
-
-    LANGCHAIN_AVAILABLE = True
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    LANGCHAIN_OLLAMA_AVAILABLE = True
 except ImportError:
-    LANGCHAIN_AVAILABLE = False
+    pass
 
 
 FINANCE_KNOWLEDGE = """
@@ -67,12 +74,82 @@ class FinanceChatbot:
         self.user_id = user_id
         self.llm = None
         self.qa_chain = None
+        self.provider = settings.LLM_PROVIDER
         self._setup()
 
     def _setup(self):
-        if not LANGCHAIN_AVAILABLE:
-            return
+        if self.provider == "groq" and LANGCHAIN_GROQ_AVAILABLE and settings.GROQ_API_KEY:
+            self._setup_groq()
+        elif self.provider == "ollama" and LANGCHAIN_OLLAMA_AVAILABLE:
+            self._setup_ollama()
+        else:
+            # Fallback: try groq if key exists
+            if settings.GROQ_API_KEY and LANGCHAIN_GROQ_AVAILABLE:
+                self._setup_groq()
+            elif LANGCHAIN_OLLAMA_AVAILABLE:
+                self._setup_ollama()
 
+    def _setup_groq(self):
+        try:
+            from langchain_core.prompts import ChatPromptTemplate
+            from langchain_core.runnables import RunnablePassthrough
+            from langchain_core.output_parsers import StrOutputParser
+            from langchain.text_splitter import RecursiveCharacterTextSplitter
+            from langchain_community.vectorstores import Chroma
+            from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
+            self.llm = ChatGroq(
+                api_key=settings.GROQ_API_KEY,
+                model="llama-3.1-8b-instant",
+                temperature=0.7,
+            )
+
+            # Create embeddings using a local model
+            embeddings = HuggingFaceBgeEmbeddings(
+                model_name="BAAI/bge-small-zh-v1.5",
+                model_kwargs={"device": "cpu"},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=50,
+            )
+            texts = text_splitter.split_text(FINANCE_KNOWLEDGE)
+
+            vectorstore = Chroma.from_texts(
+                texts=texts,
+                embedding=embeddings,
+                persist_directory=f"/tmp/chroma_groq_{self.user_id}",
+            )
+
+            retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+            prompt_template = """Bạn là một chuyên gia tư vấn tài chính cá nhân.
+Dựa trên thông tin sau, hãy trả lời câu hỏi của người dùng một cách hữu ích và chi tiết.
+
+Ngữ cảnh:
+{context}
+
+Câu hỏi: {question}
+
+Trả lời (bằng tiếng Việt):"""
+
+            prompt = ChatPromptTemplate.from_template(prompt_template)
+
+            self.qa_chain = (
+                {"context": retriever, "question": RunnablePassthrough()}
+                | prompt
+                | self.llm
+                | StrOutputParser()
+            )
+        except Exception as e:
+            print(f"Groq setup failed: {e}")
+            self.qa_chain = None
+
+    def _setup_ollama(self):
+        if not LANGCHAIN_OLLAMA_AVAILABLE:
+            return
         try:
             self.llm = Ollama(
                 model="llama3",
@@ -80,7 +157,6 @@ class FinanceChatbot:
                 temperature=0.7,
             )
 
-            # Create knowledge base
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=500,
                 chunk_overlap=50,
@@ -95,7 +171,7 @@ class FinanceChatbot:
             vectorstore = Chroma.from_texts(
                 texts=texts,
                 embedding=embeddings,
-                persist_directory=f"/tmp/chroma_{self.user_id}",
+                persist_directory=f"/tmp/chroma_ollama_{self.user_id}",
             )
 
             from langchain.prompts import PromptTemplate
@@ -119,22 +195,25 @@ Trả lời (bằng tiếng Việt):"""
             from langchain.chains.retrieval import create_retrieval_chain
             retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
             self.qa_chain = create_retrieval_chain(retriever, document_chain)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Ollama setup failed: {e}")
+            self.qa_chain = None
 
     def chat(self, message: str) -> dict:
         if self.qa_chain is None:
-            # Fallback: simple keyword-based response
             response = self._fallback_response(message)
             return {"response": response, "sources": []}
 
         try:
-            result = self.qa_chain.invoke({"input": message})
+            result = self.qa_chain.invoke(message)
+            if isinstance(result, str):
+                return {"response": result, "sources": []}
             return {
-                "response": result["answer"],
-                "sources": [doc.page_content[:100] for doc in result.get("context", [])],
+                "response": result.get("answer", result),
+                "sources": [],
             }
         except Exception as e:
+            print(f"Chat error: {e}")
             return {"response": self._fallback_response(message), "sources": []}
 
     def _fallback_response(self, message: str) -> str:

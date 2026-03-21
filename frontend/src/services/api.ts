@@ -81,16 +81,20 @@ class ApiService {
     return this.request<any[]>('/accounts/');
   }
 
-  async createAccount(data: { name: string; account_type: string; balance?: number; currency?: string; icon?: string }) {
+  async createAccount(data: { name: string; account_type: string; currency?: string; icon?: string }) {
     return this.request('/accounts/', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async updateAccount(id: number, data: Partial<{ name: string; balance: number; currency: string; icon: string }>) {
+  async updateAccount(id: number, data: Partial<{ name: string; currency: string; icon: string; account_type: string }>) {
     return this.request(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteAccount(id: number) {
     return this.request(`/accounts/${id}`, { method: 'DELETE' });
+  }
+
+  async transfer(data: { from_account_id: number; to_account_id: number; amount: number; description?: string; date: string }) {
+    return this.request('/accounts/transfer', { method: 'POST', body: JSON.stringify(data) });
   }
 
   // Categories
@@ -152,8 +156,29 @@ class ApiService {
     return this.request(`/budgets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  async deleteBudget(id: number) {
-    return this.request(`/budgets/${id}`, { method: 'DELETE' });
+  async deleteBudget(id: number, password: string) {
+    const formData = new FormData();
+    formData.append('password', password);
+    const headers: Record<string, string> = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(`${API_BASE}/budgets/${id}`, {
+      method: 'DELETE',
+      headers,
+      body: formData,
+    });
+    if (response.status === 204 || response.status === 200) {
+      return;
+    }
+    if (response.status === 401) {
+      this.token = null;
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+    throw new Error(error.detail || 'Request failed');
   }
 
   // Dashboard
@@ -168,7 +193,10 @@ class ApiService {
 
   // AI
   async categorizeTransaction(description: string, amount?: number) {
-    return this.request<any>(`/ai/categorize?description=${encodeURIComponent(description)}${amount ? '&amount=' + amount : ''}`);
+    return this.request<any>(`/ai/categorize`, {
+      method: 'POST',
+      body: JSON.stringify({ description, amount }),
+    });
   }
 
   async getCashFlowPrediction(months?: number) {
@@ -180,10 +208,37 @@ class ApiService {
   }
 
   // Chatbot
-  async chat(message: string) {
-    return this.request<{ response: string; sources?: string[] }>('/chatbot/chat', {
+  async chat(message: string, sessionId?: number) {
+    return this.request<{ response: string; sources?: string[]; session_id?: number }>('/chatbot/chat', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, session_id: sessionId }),
+    });
+  }
+
+  // Chat Sessions
+  async getChatSessions() {
+    return this.request<any[]>('/chatbot/sessions/');
+  }
+
+  async createChatSession(title?: string) {
+    return this.request<any>('/chatbot/sessions/', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+  }
+
+  async getChatSession(id: number) {
+    return this.request<any>(`/chatbot/sessions/${id}`);
+  }
+
+  async deleteChatSession(id: number) {
+    return this.request<void>(`/chatbot/sessions/${id}`, { method: 'DELETE' });
+  }
+
+  async updateChatSession(id: number, title: string) {
+    return this.request<any>(`/chatbot/sessions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title }),
     });
   }
 }

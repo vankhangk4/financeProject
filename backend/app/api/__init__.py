@@ -7,6 +7,8 @@ from app.api.dashboard import router as dashboard_router
 from app.api.reports import router as reports_router
 from app.api.ai import router as ai_router
 from app.api.chatbot import router as chatbot_router
+from app.api.alerts import router as alerts_router
+from app.api.chat_sessions import router as chat_sessions_router
 
 __all__ = [
     "auth_router",
@@ -18,4 +20,6 @@ __all__ = [
     "reports_router",
     "ai_router",
     "chatbot_router",
+    "alerts_router",
+    "chat_sessions_router",
 ]

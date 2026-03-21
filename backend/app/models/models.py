@@ -8,6 +8,7 @@ import enum
 class TransactionType(str, enum.Enum):
     INCOME = "income"
     EXPENSE = "expense"
+    TRANSFER = "transfer"
 
 
 class BudgetPeriod(str, enum.Enum):
@@ -31,6 +32,8 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     ai_models = relationship("AIModel", back_populates="user", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
+    chat_history = relationship("ChatHistory", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -76,7 +79,7 @@ class Transaction(Base):
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     amount = Column(Float, nullable=False)
-    transaction_type = Column(SQLEnum(TransactionType), nullable=False)
+    transaction_type = Column(String(20), nullable=False)
     description = Column(Text, nullable=True)
     date = Column(DateTime(timezone=True), nullable=False)
     is_ai_categorized = Column(Boolean, default=False)
@@ -95,7 +98,7 @@ class Budget(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
     amount = Column(Float, nullable=False)
-    period = Column(SQLEnum(BudgetPeriod), default=BudgetPeriod.MONTHLY)
+    period = Column(String(20), default=BudgetPeriod.MONTHLY.value)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -116,11 +119,28 @@ class AIModel(Base):
     user = relationship("User", back_populates="ai_models")
 
 
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), default="Phiên mới")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatHistory", back_populates="session", cascade="all, delete-orphan")
+
+
 class ChatHistory(Base):
     __tablename__ = "chat_history"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=True)
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="chat_history")
+    session = relationship("ChatSession", back_populates="messages")

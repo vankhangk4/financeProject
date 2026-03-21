@@ -93,6 +93,28 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface ChatMessageItem {
+  id: number;
+  user_id: number;
+  session_id: number | null;
+  message: string;
+  response: string;
+  created_at: string;
+}
+
+export interface ChatSession {
+  id: number;
+  user_id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ChatSessionDetail extends ChatSession {
+  messages: ChatMessageItem[];
+}
+
 export interface CashFlowPrediction {
   month: string;
   predicted_income: number;

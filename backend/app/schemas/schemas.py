@@ -35,14 +35,12 @@ class UserResponse(BaseModel):
 class AccountCreate(BaseModel):
     name: str
     account_type: str
-    balance: float = 0.0
     currency: str = "VND"
     icon: str = "wallet"
 
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
-    balance: Optional[float] = None
     currency: Optional[str] = None
     icon: Optional[str] = None
 
@@ -151,6 +149,25 @@ class BudgetProgress(BaseModel):
     percentage: float
 
 
+# Transfer
+class TransferCreate(BaseModel):
+    from_account_id: int
+    to_account_id: int
+    amount: float = Field(gt=0)
+    description: Optional[str] = None
+    date: datetime
+
+
+class TransferResponse(BaseModel):
+    from_transaction: TransactionResponse
+    to_transaction: TransactionResponse
+
+
+# Confirm Delete
+class ConfirmDelete(BaseModel):
+    password: str = Field(min_length=1)
+
+
 # Dashboard
 class DashboardStats(BaseModel):
     total_balance: float
@@ -210,11 +227,50 @@ class AnomalyAlert(BaseModel):
 # Chatbot
 class ChatMessage(BaseModel):
     message: str
+    session_id: Optional[int] = None
 
 
 class ChatResponse(BaseModel):
     response: str
     sources: Optional[List[str]] = None
+    session_id: Optional[int] = None
+
+
+# Chat Sessions
+class ChatSessionCreate(BaseModel):
+    title: Optional[str] = None
+
+
+class ChatSessionUpdate(BaseModel):
+    title: str
+
+
+class ChatSessionResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ChatMessageItem(BaseModel):
+    id: int
+    user_id: int
+    session_id: Optional[int]
+    message: str
+    response: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatSessionDetail(ChatSessionResponse):
+    messages: List[ChatMessageItem] = []
 
 
 # Pagination
